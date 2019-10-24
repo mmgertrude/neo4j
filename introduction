@@ -1,0 +1,305 @@
+Examples of graph databases:
+SAP HANA
+Neo4j
+
+
+To model the one way relationship:
+Ann (A person) loves Dan (another person)
+code: 
+CREATE (:Person{name:"Ann"}) - [:LOVES] -> (:Person{name:"Dan"})
+In the above:
+(:Person{name:"Ann"})   ------------    is a NODE
+(:Person{name:"Dan"})   ------------    is a NODE
+:Person     ------------------------    is a LABEL
+{name:"Ann"})-----------------------    is a PROPERTY
+{name:"Dan"})-----------------------    is a PROPERTY
+
+To find a two way relationship eg a FB friend: Just omit the arrow direction
+MATCH (:Person{name:"Ann"}) - [:FB_FRIENDS] - (:Person)
+The above matches all of Ann´s friends, regardless of who innitiated teh friendship
+
+NOTE also:
+MATCH (:Person{name:"Ann"}) - [:FB_FRIENDS] -> (:Person{name:"Dan"})
+The above matches just teh Ann/Dan friendship, as long as Ann initiated it.
+
+When creating a relationship it has to have a direction, however when querrying the relationship
+it does not have to always have a direction.
+
+STEPS IN USING Neo4j:
+1. create your model: This will include modelin your nodes, properties, labels etc
+2. Load your data: The format should be CSV
+3. querrying: 
+    Developers Use the built in web appln that gives results in graph form, tab etc.
+    Use the code written by developers to querry Neo4j servers using Neo4j APIs
+    The code to querry Neo4j can be written in many language drivers eg:
+        Java, JavaScript, Ruby, Python, PHP, .NET etc
+    For improved response time, You can write your own native Server-Side Extensions in Java to hard code how to traverse the graph
+    for your querries ruther than let Cipher code optimizer how to traverse the graph for you.
+
+For data tabular data with columns and rows, it might be best stored in a relational DB, If your data is truely
+relationtional or truely connected, then you will store it in a graph DB. See the image architectural options
+
+MOVING FROM RDBM TO GRAPH OPTIONS:
+* If all of your data is relational and highly connected then you can move all of it to a graph DB
+* Migrate just a subset data. The one that is connected and keep the keytype data or tabular data in the old system
+* It can be saved in both places (rdbm and graph) and then let the application choose best place to querry
+
+Why move to graph databases?
+* Graphs can be easily read - intuitive 
+* Easier to read querries in Cipher
+* faster
+
+Exercise
+Convert the famous NorthWind RDBM to Grahph databases
+1. Given the ER diagram, remove the FK and replace them with relationships
+2. locate the join tables eg EmployeeTerritory table which joins the Employeess table with the Territory table.
+Turn the join table into a relationship. For complex join tables turn them into a relationship that has properties
+
+HOW TO QUERRY YOUR GRAPH
+Use Cypher the graph query language. Its readable and can perform CRUD on graphs (Create, Read, Update and Delete)
+example of a querry: Who drives a car owned by a lover?
+
+MATCH
+    (p1:Person)-[:DRIVES]->(c:Car)-[:OWNED_BY]->(p2:Person)<-[:LOVES]-(p1)
+RETURN
+    p1
+
+NOTE: We use ASCiiArt
+Nodes are shown by () or (p) to refer to the (p) node later in the querry.
+Lables and tags start with : and group nodes by roles or types eg (p:Person:Mammal)
+Nodes can have properties. (p:Person {name: "Veronica"})
+ASCiiArt for Relationships:
+*Relationships are  wrapped with hyphens --> or square brackets -[h:HIRED]->
+*Relationship Direction is with < > eg (p1)-[:HIRED]->(p2)  Or (p1)<-[:HIRED]-(p2)
+*Relationships can also have properties eg -[:HIRED {type: 'fulltime'}]->
+
+Basic Create statement:
+CREATE (:Person{name:"Ann"}) - [:LOVES] -> (:Person{name:"Dan"})
+
+Basic Querry: Who does Ann love?
+my pseudocode version:
+Find me a person named Ann, who loves another person, return that other person
+code:
+MATCH
+    (:Person{name:"Ann"})-[:LOVES]->(op:Person)
+RETURN
+    op
+here op is a variable of other person.
+
+task:
+find a person with name Ann who drives a car / Find Anns car
+MATCH
+    (:Person{name:"Ann"})-[:DRIVES]->(c:Car)
+RETURN
+    c
+
+Alternative querry:
+MATCH(
+    a:Person)-[:Drives]->(c:Car)
+WHERE
+    a.name = "Ann"
+RETURN
+    c
+
+ADDING properties
+*Use SET to update labels on nodes and properties on nodes and also to update relationships.
+example task:
+for the car found above update its properties then return it
+MATCH
+    (:Person{name:"Ann"})-[:DRIVES]->(c:Car)
+SET
+    c.brand = "Volvo",
+    c.model = "V70"
+RETURN
+    c
+
+*******************************************************************************************************
+ENSURING UNIQUENESS
+*******************************************************************************************************
+* for example not to have several nodes of the same person
+this can be done using constrains:
+
+CREATE CONSTRAINT ON (p:Person)
+ASSERT p.name IS UNIQUE
+
+Example scenarios that could cause errors
+ANn exists in the database, we want to add a new relationship "Ann has a Pet named Sam"
+doing this will raise an error:
+    CREATE (a:Person {name:"Ann"})
+    CREATE (a)-[:HAS_PET]->(:Dog{name:"Sam"})
+The error will be ".... constraintValidationFailed: .... already exists with label ´person´and propety ´name´= 'Ann'
+
+instead use a MERGE statement:
+MERGE (a:Person {name:"Ann"})
+CREATE (a)-[:HAS_PET]-> (:Dog {name: "Sam"})
+
+NOTE: for the above, if ann doesnot already exist in the db she will be created
+
+Other example:
+MERGE (a:Person {name:"Ann"})
+ON CREATE SET
+    a.twitter = "@ann"
+MERBE (a)-[:HAS_PET]-> (:Dog {name: "Sam"})
+
+In the above: find an existing person Ann, if not found still go ahead and set person Anns twitter property
+to @ann. Create the has pet relationship if this exact relationship doesnot already exist. In this way this will not
+result in Ann having 2 dogs both named Sam.
+
+*******************************************************************************************************
+MORE ABOUT CYPHER
+*******************************************************************************************************
+Has keywords eg MATCH, RETURN
+example 
+    MATCH path = (:Person)-[:ACTED_IN]->(:Movie)
+    RETURN path
+
+in the above 
+    MATCH and RETURN are Cypher keywords 
+    path is a variable
+    :Movie is a node label
+    :ACTED_IN is a relationship
+The query finds people who acted in movies and returns the relationships tha match that by returning path
+
+Results can be graph or tabular depending on the query. for example if the returned  nodes and relationship you will get back a graph.
+if you return specific properties by name you will get tabular results.
+
+example yielding a graph:
+---------------------------
+MATCH (p:Person {name:"Tom hanks"})-[r:ACTED_IN|DIRECTED]-(m:Movie)
+RETURN p, r, m;
+
+example yielding a table:
+---------------------------
+MATCH (p:Person {name:"Tom hanks"})-[r:ACTED_IN|DIRECTED]-(m:Movie)
+RETURN p.name, type(r), m.title;
+
+***********************************************
+VARIABLES:
+Used to refer to relationsips eg the h in -[h:HIRED]->
+Used to refer to nodes eg the p1 and p2 in (p1)-[:HIRED]->(p2)  Or (p1)<-[:HIRED]-(p2))
+
+CASE SENSITIVITY
+***********************************************
+The following are case sensitive:
+Node labels, Relationship types, property keys
+The following is case insensitive_
+Cypher keywords
+
+Tip for setting properties
+***********************************************
+one format:
+MATCH
+    (:Person{name:"Ann"})-[:DRIVES]->(c:Car)
+WHERE
+    a.name="Ann"
+SET
+    c.brand = "Volvo",
+    c.model = "V70"
+RETURN
+    c
+
+
+alternative format: use an object to set properties
+MATCH
+    (:Person{name:"Ann"})-[:DRIVES]->(c:Car)
+WHERE
+    a.name="Ann"
+SET c+={brand: 'Volvo', model: 'V70'}
+RETURN
+    c
+***********************************************
+AGGREGATING
+***********************************************
+Example: We want to group by name. The following code implicitly groups by p.name
+MATCH(p:Person)-[:ACTED_IN]->(m:Movie)
+RETURN p.name, count(*) AS numberOfMovies
+
+potential results:
+p.name                              numberOfMovies
+"River Phoenix"                         1
+"Halle Berry"                           1
+"Ben Miles"                             3
+"Ethan Hawke"                           1
+
+list of common aggregating functions:
+count(*) ---- gives number of matching rows
+count(variable)---- gices the number of non-null values
+count(DISTINCT variable) etc etc
+
+you can even write your own aggregating functions visit the online source
+
+
+The WHERE clause
+***********************************************
+used for filtering results.
+to find movies with the title "The matrix"
+
+using the JSON like syntax:
+MATCH (m:Movie){title: "The Matrix"})
+RETURN m
+
+alternatively using the WHERE clause:
+MATCH(m:Movie)
+WHERE m.tile = "The Matrix"
+RETURN m
+
+find a person who acted in a movie where the movie release date is >= the year 2000
+MATCH(m:Movie)
+WHERE m.released >=2000
+RETURN m.released, a.name;
+
+Other comparision operators
+***********************************************
+=, <,>,<=,<> (not equal to), >=, IS NULL, IS NOT NULL, AND, OR, XOR, NOT
+
+null: Represents missing or undefined values. 
+You donot store a null value in a property. it just doesnot exist on that particular node
+
+=~ is used for regular expression matching eg
+MATCH (p:Person)-[r:ACTED_IN]->(m:Movie)
+WHERE p.name =~ "K.+" OR m.released >2000
+RETURN p,r,m
+in the above find a person who acted in a movie where that persons name starts with a K and followed by a 0 or 1 other xters
+OR the movie release date is greater than 2000
+
+
+example
+MATCH (p:Person)-[r:ACTED_IN]->(m:Movie)
+WHERE  m.released >2000 OR  
+    (m.released = 1997 AND m.title = 'As Good as It Gets')
+RETURN p.name , m.released, m.title
+
+
+
+ From Neo4j Desktop, you can open Neo4j Browser. 
+ This is done by clicking <your project name> in the Desktop screen, then click Manage on your database.
+
+  You can also access this from a regular browser window by typing http://localhost:7474 
+  and signing in with Username: neo4j, Password: <your database password (set up in Desktop)>.
+
+  Please remember the password. 
+  If you forget it, you have to remove the credentials file in data/dbms/authorization.
+
+Creating a relationship
+MATCH (a:Artist),(b:Album)
+WHERE a.Name = "Strapping Young Lad" AND b.Name = "Heavy as a Really Heavy Thing"
+CREATE (a)-[r:RELEASED]->(b)
+RETURN r
+
+Deleting the relationship:
+MATCH (:Artist)-[r:RELEASED]-(:Album) 
+DELETE r
+
+The REMOVE clause is used to remove properties from nodes and relationships, and to remove labels from nodes.
+The DELETE clause is used to delete nodes, relationships or paths.
+
+Delete a node with all its relationships:
+MATCH (n { name: 'Andy' })
+DETACH DELETE n
+
+
+Delete relationships only
+MATCH (n { name: 'Andy' })-[r:KNOWS]->()
+DELETE r
+This deletes all outgoing KNOWS relationships from the node with the name 'Andy'.
+
